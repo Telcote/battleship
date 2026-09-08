@@ -14,7 +14,7 @@ from app.errors import (
     SessionNotFound,
 )
 from app.models import GameSession, Shot
-from app.services import game_service
+from app.services import game
 
 SHIPS = [
     {"cells": ["A1", "A2", "A3", "A4"], "hits": []},
@@ -48,7 +48,7 @@ async def _reread_shots(session: AsyncSession, game_id: uuid.UUID) -> list[Shot]
 async def test_create_session_persists_starting_state(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
 
     stored = await _reread_session(session, game_id)
@@ -62,11 +62,11 @@ async def test_create_session_persists_starting_state(
 async def test_create_session_rejects_duplicate_game_id(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
 
     try:
-        await game_service.create_session(session, game_id, SHIPS)
+        await game.create_session(session, game_id, SHIPS)
         raise AssertionError("expected SessionAlreadyExists")
     except SessionAlreadyExists:
         pass
@@ -75,10 +75,10 @@ async def test_create_session_rejects_duplicate_game_id(
 async def test_opponent_shot_hit_persists_ship_hits_and_own_hits(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
 
-    result = await game_service.handle_opponent_shot(session, game_id, "A2")
+    result = await game.handle_opponent_shot(session, game_id, "A2")
     await session.commit()
     assert result == "hit"
 
@@ -97,10 +97,10 @@ async def test_opponent_shot_hit_persists_ship_hits_and_own_hits(
 async def test_opponent_shot_miss_passes_turn_to_self(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
 
-    result = await game_service.handle_opponent_shot(session, game_id, "H8")
+    result = await game.handle_opponent_shot(session, game_id, "H8")
     await session.commit()
     assert result == "miss"
 
@@ -112,10 +112,10 @@ async def test_opponent_shot_miss_passes_turn_to_self(
 async def test_opponent_shot_kill_on_single_deck_ship(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
 
-    result = await game_service.handle_opponent_shot(session, game_id, "J1")
+    result = await game.handle_opponent_shot(session, game_id, "J1")
     await session.commit()
     assert result == "kill"
 
@@ -126,13 +126,13 @@ async def test_opponent_shot_kill_on_single_deck_ship(
 async def test_opponent_shot_repeated_cell_is_rejected_and_not_duplicated(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
-    await game_service.handle_opponent_shot(session, game_id, "B5")
+    await game.handle_opponent_shot(session, game_id, "B5")
     await session.commit()
 
     try:
-        await game_service.handle_opponent_shot(session, game_id, "B5")
+        await game.handle_opponent_shot(session, game_id, "B5")
         raise AssertionError("expected InvalidCoordinate")
     except InvalidCoordinate:
         pass
@@ -143,7 +143,7 @@ async def test_opponent_shot_repeated_cell_is_rejected_and_not_duplicated(
 
 async def test_opponent_shot_against_unknown_session(session: AsyncSession) -> None:
     try:
-        await game_service.handle_opponent_shot(session, uuid.uuid4(), "A1")
+        await game.handle_opponent_shot(session, uuid.uuid4(), "A1")
         raise AssertionError("expected SessionNotFound")
     except SessionNotFound:
         pass
@@ -152,13 +152,13 @@ async def test_opponent_shot_against_unknown_session(session: AsyncSession) -> N
 async def test_opponent_shot_against_closed_session_is_rejected(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
-    await game_service.handle_close(session, game_id, "opponent_defeated")
+    await game.handle_close(session, game_id, "opponent_defeated")
     await session.commit()
 
     try:
-        await game_service.handle_opponent_shot(session, game_id, "A1")
+        await game.handle_opponent_shot(session, game_id, "A1")
         raise AssertionError("expected SessionClosed")
     except SessionClosed:
         pass
@@ -186,7 +186,7 @@ async def test_shot_result_hit_clears_pending_shot_and_keeps_turn(
 ) -> None:
     await _seed_active_session_with_pending_shot(session, game_id, "D7")
 
-    await game_service.handle_shot_result(session, game_id, "D7", "hit")
+    await game.handle_shot_result(session, game_id, "D7", "hit")
     await session.commit()
 
     stored = await _reread_session(session, game_id)
@@ -202,7 +202,7 @@ async def test_shot_result_miss_passes_turn_to_opponent(
 ) -> None:
     await _seed_active_session_with_pending_shot(session, game_id, "D7")
 
-    await game_service.handle_shot_result(session, game_id, "D7", "miss")
+    await game.handle_shot_result(session, game_id, "D7", "miss")
     await session.commit()
 
     stored = await _reread_session(session, game_id)
@@ -215,7 +215,7 @@ async def test_shot_result_coordinate_mismatch_is_rejected_and_db_unchanged(
     await _seed_active_session_with_pending_shot(session, game_id, "D7")
 
     try:
-        await game_service.handle_shot_result(session, game_id, "D8", "hit")
+        await game.handle_shot_result(session, game_id, "D8", "hit")
         raise AssertionError("expected InvalidShotResult")
     except InvalidShotResult:
         pass
@@ -229,11 +229,11 @@ async def test_shot_result_coordinate_mismatch_is_rejected_and_db_unchanged(
 async def test_shot_result_without_pending_shot_is_rejected(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
 
     try:
-        await game_service.handle_shot_result(session, game_id, "D7", "hit")
+        await game.handle_shot_result(session, game_id, "D7", "hit")
         raise AssertionError("expected NotYourTurn")
     except NotYourTurn:
         pass
@@ -242,10 +242,10 @@ async def test_shot_result_without_pending_shot_is_rejected(
 async def test_close_persists_status_and_reason_without_deleting_row(
     session: AsyncSession, game_id: uuid.UUID
 ) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
 
-    await game_service.handle_close(session, game_id, "opponent_defeated")
+    await game.handle_close(session, game_id, "opponent_defeated")
     await session.commit()
 
     stored = await _reread_session(session, game_id)
@@ -255,13 +255,13 @@ async def test_close_persists_status_and_reason_without_deleting_row(
 
 
 async def test_close_twice_is_rejected(session: AsyncSession, game_id: uuid.UUID) -> None:
-    await game_service.create_session(session, game_id, SHIPS)
+    await game.create_session(session, game_id, SHIPS)
     await session.commit()
-    await game_service.handle_close(session, game_id, "opponent_defeated")
+    await game.handle_close(session, game_id, "opponent_defeated")
     await session.commit()
 
     try:
-        await game_service.handle_close(session, game_id, "opponent_defeated")
+        await game.handle_close(session, game_id, "opponent_defeated")
         raise AssertionError("expected AlreadyClosed")
     except AlreadyClosed:
         pass
@@ -269,7 +269,7 @@ async def test_close_twice_is_rejected(session: AsyncSession, game_id: uuid.UUID
 
 async def test_close_unknown_session(session: AsyncSession) -> None:
     try:
-        await game_service.handle_close(session, uuid.uuid4(), "opponent_defeated")
+        await game.handle_close(session, uuid.uuid4(), "opponent_defeated")
         raise AssertionError("expected SessionNotFound")
     except SessionNotFound:
         pass

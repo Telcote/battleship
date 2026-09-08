@@ -1,7 +1,7 @@
 """Входящие ручки 3, 4, 5 (docs/contract.md v2.0): арена вызывает сервис.
 
 Тонкий слой: валидация тела уже сделана Pydantic-схемами, вся игровая логика и
-проверки — в app.services.game_service. Здесь только вызов сервиса, коммит
+проверки — в app.services.game. Здесь только вызов сервиса, коммит
 транзакции и упаковка ответа по контракту.
 """
 
@@ -18,7 +18,7 @@ from app.schemas import (
     OpponentShotResponse,
     ShotResultRequest,
 )
-from app.services import game_service
+from app.services import game
 
 router = APIRouter()
 
@@ -29,7 +29,7 @@ async def opponent_shot(
     body: OpponentShotRequest,
     session: AsyncSession = Depends(get_session),
 ) -> OpponentShotResponse:
-    result = await game_service.handle_opponent_shot(session, game_id, body.coordinate)
+    result = await game.handle_opponent_shot(session, game_id, body.coordinate)
     await session.commit()
     return OpponentShotResponse(result=result)
 
@@ -40,7 +40,7 @@ async def shot_result(
     body: ShotResultRequest,
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    await game_service.handle_shot_result(session, game_id, body.coordinate, body.result)
+    await game.handle_shot_result(session, game_id, body.coordinate, body.result)
     await session.commit()
     return Response(status_code=status.HTTP_200_OK)
 
@@ -51,6 +51,6 @@ async def close_game(
     body: CloseGameRequest,
     session: AsyncSession = Depends(get_session),
 ) -> CloseGameResponse:
-    await game_service.handle_close(session, game_id, body.reason)
+    await game.handle_close(session, game_id, body.reason)
     await session.commit()
     return CloseGameResponse(status="closed")

@@ -1,10 +1,3 @@
-"""Обработка входящих ручек 3, 4, 5 (docs/contract.md v2.0): арена вызывает сервис.
-
-Одна HTTP-обработка = одна транзакция. Строка сессии читается с `SELECT ... FOR UPDATE`,
-поэтому запросы по одной сессии сериализуются, а по разным — идут параллельно
-(см. docs/architecture.md, п. 5.1, 5.5).
-"""
-
 import uuid
 
 from sqlalchemy import func, select
@@ -24,7 +17,7 @@ from app.errors import (
 from app.models import GameSession, Shot
 
 
-async def _lock_session(session: AsyncSession, game_id: uuid.UUID) -> GameSession:
+async def lock_session(session: AsyncSession, game_id: uuid.UUID) -> GameSession:
     result = await session.execute(
         select(GameSession).where(GameSession.id == game_id).with_for_update()
     )
@@ -34,7 +27,7 @@ async def _lock_session(session: AsyncSession, game_id: uuid.UUID) -> GameSessio
     return game_session
 
 
-async def _next_seq(session: AsyncSession, game_id: uuid.UUID) -> int:
+async def next_seq(session: AsyncSession, game_id: uuid.UUID) -> int:
     result = await session.execute(
         select(func.coalesce(func.max(Shot.seq), 0)).where(Shot.session_id == game_id)
     )
@@ -64,7 +57,7 @@ async def handle_opponent_shot(
     session: AsyncSession, game_id: uuid.UUID, coordinate: str
 ) -> board.ShotResult:
     """Ручка 3 — арена сообщает координату своего выстрела, сервис бьёт по своему полю."""
-    game_session = await _lock_session(session, game_id)
+    game_session = await lock_session(session, game_id)
     if game_session.status == "closed":
         raise SessionClosed(f"game {game_id} is closed")
 
@@ -83,7 +76,7 @@ async def handle_opponent_shot(
     session.add(
         Shot(
             session_id=game_id,
-            seq=await _next_seq(session, game_id),
+            seq=await next_seq(session, game_id),
             direction="incoming",
             coordinate=coordinate,
             result=result,
@@ -100,7 +93,7 @@ async def handle_shot_result(
     session: AsyncSession, game_id: uuid.UUID, coordinate: str, result: board.ShotResult
 ) -> None:
     """Ручка 4 — арена подтверждает результат последнего выстрела сервиса."""
-    game_session = await _lock_session(session, game_id)
+    game_session = await lock_session(session, game_id)
     if game_session.status == "closed":
         raise SessionClosed(f"game {game_id} is closed")
     if game_session.pending_shot is None:
@@ -131,7 +124,7 @@ async def handle_shot_result(
 
 async def handle_close(session: AsyncSession, game_id: uuid.UUID, reason: str) -> None:
     """Ручка 5 — арена закрывает сессию. Повторное закрытие не идемпотентно (400)."""
-    game_session = await _lock_session(session, game_id)
+    game_session = await lock_session(session, game_id)
     if game_session.status == "closed":
         raise AlreadyClosed(f"game {game_id} is already closed")
 

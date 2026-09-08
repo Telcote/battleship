@@ -5,7 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import GameSession
-from app.services import game_service
+from app.services import game
 
 SHIPS = [
     {"cells": ["A1", "A2", "A3", "A4"], "hits": []},
@@ -16,7 +16,7 @@ SHIPS = [
 @pytest_asyncio.fixture
 async def game_id(session: AsyncSession) -> uuid.UUID:
     new_id = uuid.uuid4()
-    await game_service.create_session(session, new_id, SHIPS)
+    await game.create_session(session, new_id, SHIPS)
     await session.commit()
     yield new_id
     stored = await session.get(GameSession, new_id)
