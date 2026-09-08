@@ -28,7 +28,7 @@ def test_after_two_collinear_hits_continues_the_line() -> None:
 
 def test_after_kill_does_not_shoot_into_the_halo() -> None:
     rng = random.Random(4)
-    shots = [("J1", "kill")]
+    shots = [("J1", "killed")]
     for _ in range(30):
         coordinate = targeting.choose(shots, rng)
         assert coordinate not in ("I1", "I2", "J2")
@@ -55,7 +55,7 @@ def test_sinks_any_generated_fleet_within_bounded_shots() -> None:
             hits_by_ship[ship_index].add(coordinate)
             if len(hits_by_ship[ship_index]) == len(ships[ship_index]):
                 sunk[ship_index] = True
-                shots.append((coordinate, "kill"))
+                shots.append((coordinate, "killed"))
             else:
                 shots.append((coordinate, "hit"))
 

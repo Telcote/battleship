@@ -16,7 +16,7 @@ SHIPS = [
 
 
 @pytest_asyncio.fixture
-async def game_id(session: AsyncSession) -> uuid.UUID:
+async def session_id(session: AsyncSession) -> uuid.UUID:
     new_id = uuid.uuid4()
     yield new_id
     stored = await session.get(GameSession, new_id)
@@ -25,108 +25,108 @@ async def game_id(session: AsyncSession) -> uuid.UUID:
         await session.commit()
 
 
-async def _reread_session(session: AsyncSession, game_id: uuid.UUID) -> GameSession | None:
+async def _reread_session(session: AsyncSession, session_id: uuid.UUID) -> GameSession | None:
     session.expire_all()
-    return await session.get(GameSession, game_id)
+    return await session.get(GameSession, session_id)
 
 
-async def _reread_shots(session: AsyncSession, game_id: uuid.UUID) -> list[Shot]:
+async def _reread_shots(session: AsyncSession, session_id: uuid.UUID) -> list[Shot]:
     session.expire_all()
     result = await session.execute(
-        select(Shot).where(Shot.session_id == game_id).order_by(Shot.seq)
+        select(Shot).where(Shot.session_id == session_id).order_by(Shot.seq)
     )
     return list(result.scalars().all())
 
 
-async def _seed_active_session(session: AsyncSession, game_id: uuid.UUID) -> None:
-    session.add(
-        GameSession(id=game_id, status="active", turn="self", pending_shot=None, ships=SHIPS)
-    )
+async def _seed_session(session: AsyncSession, session_id: uuid.UUID, **kwargs) -> None:
+    session.add(GameSession(id=session_id, status="active", ships=SHIPS, **kwargs))
     await session.commit()
 
 
 async def test_choose_next_shot_persists_pending_shot_and_journal_row(
-    session: AsyncSession, game_id: uuid.UUID
+    session: AsyncSession, session_id: uuid.UUID
 ) -> None:
-    await _seed_active_session(session, game_id)
+    await _seed_session(session, session_id, turn="self")
 
-    coordinate = await turn.choose_next_shot(session, game_id, random.Random(1))
+    coordinate = await turn.choose_next_shot(session, session_id, random.Random(1))
     await session.commit()
 
-    stored = await _reread_session(session, game_id)
+    stored = await _reread_session(session, session_id)
     assert stored.pending_shot == coordinate
 
-    shots = await _reread_shots(session, game_id)
+    shots = await _reread_shots(session, session_id)
     assert len(shots) == 1
     assert shots[0].direction == "outgoing"
     assert shots[0].coordinate == coordinate
     assert shots[0].result is None
 
 
-async def test_choose_next_shot_never_repeats_previous_outgoing_shots(
-    session: AsyncSession, game_id: uuid.UUID
+async def test_first_shot_settles_unknown_turn_to_self(
+    session: AsyncSession, session_id: uuid.UUID
 ) -> None:
-    await _seed_active_session(session, game_id)
+    # Жеребьёвку арена не сообщает: раз она пришла за выстрелом первой, ходим мы.
+    await _seed_session(session, session_id, turn="unknown")
+
+    await turn.choose_next_shot(session, session_id, random.Random(1))
+    await session.commit()
+
+    stored = await _reread_session(session, session_id)
+    assert stored.turn == "self"
+
+
+async def test_choose_next_shot_never_repeats_previous_outgoing_shots(
+    session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    await _seed_session(session, session_id, turn="self")
     rng = random.Random(2)
     fired: set[str] = set()
 
     for _ in range(15):
-        coordinate = await turn.choose_next_shot(session, game_id, rng)
+        coordinate = await turn.choose_next_shot(session, session_id, rng)
         await session.commit()
         assert coordinate not in fired
         fired.add(coordinate)
 
-        stored = await _reread_session(session, game_id)
-        stored.pending_shot = None
-        pending_row = (await session.execute(
-            select(Shot)
-            .where(Shot.session_id == game_id, Shot.direction == "outgoing", Shot.result.is_(None))
-            .order_by(Shot.seq.desc())
-            .limit(1)
-        )).scalar_one()
-        pending_row.result = "miss"
+        await game.handle_shot_result(session, session_id, "miss")
+        await session.commit()
+        stored = await _reread_session(session, session_id)
+        stored.turn = "self"  # промах отдаёт ход, но нам нужен следующий выстрел
         await session.commit()
 
 
 async def test_choose_next_shot_rejects_when_not_our_turn(
-    session: AsyncSession, game_id: uuid.UUID
+    session: AsyncSession, session_id: uuid.UUID
 ) -> None:
-    session.add(
-        GameSession(id=game_id, status="active", turn="opponent", pending_shot=None, ships=SHIPS)
-    )
-    await session.commit()
+    await _seed_session(session, session_id, turn="opponent")
 
     try:
-        await turn.choose_next_shot(session, game_id)
+        await turn.choose_next_shot(session, session_id)
         raise AssertionError("expected NotYourTurn")
     except NotYourTurn:
         pass
 
 
 async def test_choose_next_shot_rejects_when_a_shot_is_already_pending(
-    session: AsyncSession, game_id: uuid.UUID
+    session: AsyncSession, session_id: uuid.UUID
 ) -> None:
-    session.add(
-        GameSession(id=game_id, status="active", turn="self", pending_shot="D7", ships=SHIPS)
-    )
-    await session.commit()
+    await _seed_session(session, session_id, turn="self", pending_shot="D7")
 
     try:
-        await turn.choose_next_shot(session, game_id)
+        await turn.choose_next_shot(session, session_id)
         raise AssertionError("expected NotYourTurn")
     except NotYourTurn:
         pass
 
 
 async def test_choose_next_shot_rejects_closed_session(
-    session: AsyncSession, game_id: uuid.UUID
+    session: AsyncSession, session_id: uuid.UUID
 ) -> None:
-    await game.create_session(session, game_id, SHIPS)
-    await game.handle_close(session, game_id, "opponent_defeated")
+    await _seed_session(session, session_id, turn="self")
+    await game.handle_close(session, session_id)
     await session.commit()
 
     try:
-        await turn.choose_next_shot(session, game_id)
+        await turn.choose_next_shot(session, session_id)
         raise AssertionError("expected SessionClosed")
     except SessionClosed:
         pass
