@@ -1,13 +1,3 @@
-"""Своё поле: приём выстрела противника.
-
-Работает над форматом `ships` из game_sessions.ships (JSONB, см. docs/architecture.md 3.1):
-
-    [{"cells": ["A1", "A2"], "hits": ["A1"]}, ...]
-
-Проверка повторного выстрела здесь не делается — она требует журнала `shots`, а не только
-расстановки, и остаётся на уровне services/game_service.py.
-"""
-
 from typing import Literal, TypedDict
 
 ShotResult = Literal["miss", "hit", "kill"]
