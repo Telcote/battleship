@@ -1,0 +1,37 @@
+name: battleship
+
+# Postgres поднимается devcontainer'ом (.devcontainer/docker-compose.yml) и подключён к
+# внешней сети proxynet — здесь свой postgres не заводим, ходим в тот же по имени `db`.
+# Bind-mount'ов кода намеренно нет: при docker-outside-of-docker пути внутри devcontainer'а
+# (/workspaces/...) не существуют на хосте, где живёт демон. Контекст сборки читает CLI,
+# поэтому build работает, а изменения кода подхватываются пересборкой (--build).
+# Все адреса и пароли — только в .env (см. .env.example), в compose их нет.
+
+services:
+  app:
+    build:
+      context: ./service
+      target: runtime
+    container_name: battleship-app
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    networks:
+      default:
+        aliases:
+          - battleship-app
+
+  # Прогон тестов в образе сервиса: docker compose run --rm --build tests
+  tests:
+    build:
+      context: ./service
+      target: test
+    env_file: .env
+    profiles:
+      - test
+
+networks:
+  default:
+    name: proxynet
+    external: true
