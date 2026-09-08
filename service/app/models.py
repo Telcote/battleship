@@ -28,6 +28,7 @@ class GameSession(Base):
     pending_shot: Mapped[str | None] = mapped_column(String(3), nullable=True)
     ships: Mapped[list] = mapped_column(JSONB, nullable=False)
     own_hits: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    close_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
