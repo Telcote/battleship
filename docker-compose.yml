@@ -24,6 +24,8 @@ services:
       target: runtime
     container_name: battleship-app
     env_file: .env
+    environment:
+      POSTGRES_HOST: db
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -35,6 +37,8 @@ services:
       context: ./service
       target: test
     env_file: .env
+    environment:
+      POSTGRES_HOST: db
     depends_on:
       db:
         condition: service_healthy
