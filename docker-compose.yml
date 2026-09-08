@@ -1,13 +1,23 @@
 name: battleship
 
-# Postgres поднимается devcontainer'ом (.devcontainer/docker-compose.yml) и подключён к
-# внешней сети proxynet — здесь свой postgres не заводим, ходим в тот же по имени `db`.
-# Bind-mount'ов кода намеренно нет: при docker-outside-of-docker пути внутри devcontainer'а
-# (/workspaces/...) не существуют на хосте, где живёт демон. Контекст сборки читает CLI,
-# поэтому build работает, а изменения кода подхватываются пересборкой (--build).
-# Все адреса и пароли — только в .env (см. .env.example), в compose их нет.
-
 services:
+  db:
+    image: postgres:17
+    container_name: battleship-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   app:
     build:
       context: ./service
@@ -17,21 +27,19 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    networks:
-      default:
-        aliases:
-          - battleship-app
-
-  # Прогон тестов в образе сервиса: docker compose run --rm --build tests
+    depends_on:
+      db:
+        condition: service_healthy
   tests:
     build:
       context: ./service
       target: test
     env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
     profiles:
       - test
 
-networks:
-  default:
-    name: proxynet
-    external: true
+volumes:
+  postgres-data:
