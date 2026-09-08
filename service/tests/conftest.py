@@ -3,6 +3,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.db import get_session
 from app.main import app
 
 
@@ -20,7 +21,15 @@ async def session() -> AsyncSession:
 
 
 @pytest_asyncio.fixture
-async def client() -> AsyncClient:
+async def client(session: AsyncSession) -> AsyncClient:
+    # Роуты получают AsyncSession через ту же зависимость get_session, что и в проде —
+    # подменяем её на фикстуру session, иначе FastAPI брал бы соединение из общего
+    # app.db.engine и упирался в ту же проблему с чужим event loop, что и выше.
+    async def _get_test_session() -> AsyncSession:
+        return session
+
+    app.dependency_overrides[get_session] = _get_test_session
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+    app.dependency_overrides.pop(get_session, None)
