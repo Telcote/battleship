@@ -3,7 +3,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
-    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -23,7 +22,6 @@ class GameSession(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
-    dofirstshot: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     turn: Mapped[str] = mapped_column(String(16), nullable=False)
     pending_shot: Mapped[str | None] = mapped_column(String(3), nullable=True)
     ships: Mapped[list] = mapped_column(JSONB, nullable=False)
@@ -56,7 +54,7 @@ class Shot(Base):
     seq: Mapped[int] = mapped_column(nullable=False)
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     coordinate: Mapped[str] = mapped_column(String(3), nullable=False)
-    result: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    result: Mapped[str | None] = mapped_column(String(6), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
