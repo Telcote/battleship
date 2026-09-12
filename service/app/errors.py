@@ -8,11 +8,7 @@ class GameError(Exception):
 
 
 class SessionNotFound(GameError):
-    """game_id не существует. Ручки 2, 3, 4, 5 → 404."""
-
-
-class SessionAlreadyExists(GameError):
-    """Сессия с таким game_id уже создана. Ручка 1 → 409."""
+    """session_id не существует. Ручки 2, 3, 4, 5 → 404."""
 
 
 class SessionClosed(GameError):
@@ -24,31 +20,43 @@ class AlreadyClosed(GameError):
 
 
 class NotYourTurn(GameError):
-    """Нарушена очерёдность хода. Ручки 2, 4 → 409."""
+    """Нарушена очерёдность хода (запрошен выстрел не в свой ход). Ручка 2 → 409."""
+
+
+class OutOfSequence(GameError):
+    """Результат выстрела пришёл, а выстрела не было. Ручка 3 → 409."""
 
 
 class InvalidPlacement(GameError):
-    """Расстановка не соответствует правилам. Ручка 1 → 400."""
+    """Расстановка не соответствует правилам. Внутренняя проверка генератора расстановки."""
 
 
 class InvalidCoordinate(GameError):
-    """Координата не по формату или уже обстреляна. Ручки 2, 3 → 400."""
+    """Координата не по формату или уже обстреляна. Ручка 4 → 400."""
 
 
 class InvalidShotResult(GameError):
-    """Недопустимый result или координата не совпадает с ожидаемым выстрелом. Ручка 4 → 400."""
+    """Недопустимое значение result. Ручка 3 → 400."""
 
 
 _STATUS_BY_ERROR: dict[type[GameError], int] = {
     SessionNotFound: status.HTTP_404_NOT_FOUND,
-    SessionAlreadyExists: status.HTTP_409_CONFLICT,
     SessionClosed: status.HTTP_410_GONE,
     AlreadyClosed: status.HTTP_400_BAD_REQUEST,
     NotYourTurn: status.HTTP_409_CONFLICT,
+    OutOfSequence: status.HTTP_409_CONFLICT,
     InvalidPlacement: status.HTTP_400_BAD_REQUEST,
     InvalidCoordinate: status.HTTP_400_BAD_REQUEST,
     InvalidShotResult: status.HTTP_400_BAD_REQUEST,
 }
+
+
+def _validation_error_detail(exc: RequestValidationError) -> str:
+    for error in exc.errors():
+        inner = (error.get("ctx") or {}).get("error")
+        if isinstance(inner, Exception):
+            return str(inner)
+    return "invalid request body"
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -61,9 +69,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def validation_error_handler(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
+        errors = exc.errors()
+
+        if errors and errors[0]["loc"] and errors[0]["loc"][0] == "path":
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND, content={"detail": "session not found"}
+            )
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"detail": str(exc)},
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": _validation_error_detail(exc)},
         )
 
     @app.exception_handler(Exception)
