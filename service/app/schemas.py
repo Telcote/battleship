@@ -13,29 +13,36 @@ def validate_coordinate(value: str) -> str:
 
 
 Coordinate = Annotated[str, AfterValidator(validate_coordinate)]
-ShotResult = Literal["miss", "hit", "kill"]
+ShotResult = Literal["miss", "hit", "killed"]
 
 
 class ShipPlacement(BaseModel):
     coordinates: list[Coordinate]
 
 
-# POST /game (сервис -> арена)
-class StartGameRequest(BaseModel):
-    game_id: uuid.UUID
+# POST /game (арена -> сервис)
+class StartGameResponse(BaseModel):
+    session_id: uuid.UUID
     ships: list[ShipPlacement]
 
 
-class StartGameResponse(BaseModel):
-    is_firstshot: bool
+# POST /game/{session_id}/shot (арена -> сервис)
+class ShotResponse(BaseModel):
+    coordinate: str
 
 
-# POST /game/{game_id}/shot (сервис -> арена)
-class MakeShotRequest(BaseModel):
-    coordinate: Coordinate
+# POST /game/{session_id}/shot/result (арена -> сервис)
+class ShotResultRequest(BaseModel):
+    # тут специально str, а не Literal — иначе pydantic сам отгрызёт кривой result
+    # своим 422, а нам надо, чтобы за это отвечал сервис и отдавал 400
+    result: str
 
 
-# POST /game/{game_id}/opponent-shot (арена -> сервис)
+class AcceptedResponse(BaseModel):
+    status: Literal["accepted"]
+
+
+# POST /game/{session_id}/opponent-shot (арена -> сервис)
 class OpponentShotRequest(BaseModel):
     coordinate: Coordinate
 
@@ -44,17 +51,7 @@ class OpponentShotResponse(BaseModel):
     result: ShotResult
 
 
-# POST /game/{game_id}/shot/result (арена -> сервис)
-class ShotResultRequest(BaseModel):
-    coordinate: Coordinate
-    result: ShotResult
-
-
-# POST /game/{game_id} (арена -> сервис)
-class CloseGameRequest(BaseModel):
-    reason: str
-
-
+# POST /game/{session_id}/close (арена -> сервис)
 class CloseGameResponse(BaseModel):
     status: Literal["closed"]
 

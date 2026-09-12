@@ -24,7 +24,7 @@ def choose(shots: list[tuple[str, ShotResult]], rng: random.Random | None = None
             misses.add(cell)
         else:
             hits.add(cell)
-            if result == "kill":
+            if result == "killed":
                 kills.add(cell)
 
     remaining_sizes = Counter(placement.FLEET_SIZES)

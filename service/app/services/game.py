@@ -1,51 +1,48 @@
+import random
 import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.domain import board
+from app.domain import board, placement
 from app.errors import (
     AlreadyClosed,
     InvalidCoordinate,
     InvalidShotResult,
-    NotYourTurn,
-    SessionAlreadyExists,
+    OutOfSequence,
     SessionClosed,
     SessionNotFound,
 )
 from app.models import GameSession, Shot
 
+VALID_SHOT_RESULTS = {"miss", "hit", "killed"}
 
-async def lock_session(session: AsyncSession, game_id: uuid.UUID) -> GameSession:
+
+async def lock_session(session: AsyncSession, session_id: uuid.UUID) -> GameSession:
     result = await session.execute(
-        select(GameSession).where(GameSession.id == game_id).with_for_update()
+        select(GameSession).where(GameSession.id == session_id).with_for_update()
     )
     game_session = result.scalar_one_or_none()
     if game_session is None:
-        raise SessionNotFound(f"game {game_id} not found")
+        raise SessionNotFound(f"session {session_id} not found")
     return game_session
 
 
-async def next_seq(session: AsyncSession, game_id: uuid.UUID) -> int:
+async def next_seq(session: AsyncSession, session_id: uuid.UUID) -> int:
     result = await session.execute(
-        select(func.coalesce(func.max(Shot.seq), 0)).where(Shot.session_id == game_id)
+        select(func.coalesce(func.max(Shot.seq), 0)).where(Shot.session_id == session_id)
     )
     return result.scalar_one() + 1
 
 
-async def create_session(
-    session: AsyncSession, game_id: uuid.UUID, ships: list[board.ShipState]
-) -> GameSession:
-    """Заводит строку сессии в статусе `starting` до обращения к арене (ручка 1)."""
-    existing = await session.execute(select(GameSession.id).where(GameSession.id == game_id))
-    if existing.scalar_one_or_none() is not None:
-        raise SessionAlreadyExists(f"game {game_id} already exists")
+async def create_session(session: AsyncSession, rng: random.Random | None = None) -> GameSession:
 
+    ships = [{"cells": cells, "hits": []} for cells in placement.generate(rng)]
     game_session = GameSession(
-        id=game_id,
-        status="starting",
-        turn="opponent",
+        id=uuid.uuid4(),
+        status="active",
+        turn="unknown",
         ships=ships,
     )
     session.add(game_session)
@@ -54,16 +51,16 @@ async def create_session(
 
 
 async def handle_opponent_shot(
-    session: AsyncSession, game_id: uuid.UUID, coordinate: str
+    session: AsyncSession, session_id: uuid.UUID, coordinate: str
 ) -> board.ShotResult:
-    """Ручка 3 — арена сообщает координату своего выстрела, сервис бьёт по своему полю."""
-    game_session = await lock_session(session, game_id)
+
+    game_session = await lock_session(session, session_id)
     if game_session.status == "closed":
-        raise SessionClosed(f"game {game_id} is closed")
+        raise SessionClosed(f"session {session_id} is closed")
 
     repeated = await session.execute(
         select(Shot.id).where(
-            Shot.session_id == game_id,
+            Shot.session_id == session_id,
             Shot.direction == "incoming",
             Shot.coordinate == coordinate,
         )
@@ -72,11 +69,11 @@ async def handle_opponent_shot(
         raise InvalidCoordinate(f"cell {coordinate} already shot at")
 
     result = board.apply_opponent_shot(game_session.ships, coordinate)
-    flag_modified(game_session, "ships")  # мутация вложенного JSONB "на месте" не отслеживается
+    flag_modified(game_session, "ships")  # обновление sqlalchemy
     session.add(
         Shot(
-            session_id=game_id,
-            seq=await next_seq(session, game_id),
+            session_id=session_id,
+            seq=await next_seq(session, session_id),
             direction="incoming",
             coordinate=coordinate,
             result=result,
@@ -89,25 +86,19 @@ async def handle_opponent_shot(
     return result
 
 
-async def handle_shot_result(
-    session: AsyncSession, game_id: uuid.UUID, coordinate: str, result: board.ShotResult
-) -> None:
-    """Ручка 4 — арена подтверждает результат последнего выстрела сервиса."""
-    game_session = await lock_session(session, game_id)
+async def handle_shot_result(session: AsyncSession, session_id: uuid.UUID, result: str) -> None:
+    game_session = await lock_session(session, session_id)
     if game_session.status == "closed":
-        raise SessionClosed(f"game {game_id} is closed")
+        raise SessionClosed(f"session {session_id} is closed")
+    if result not in VALID_SHOT_RESULTS:
+        raise InvalidShotResult(f"invalid result: {result!r}")
     if game_session.pending_shot is None:
-        raise NotYourTurn(f"game {game_id} has no shot awaiting a result")
-    if game_session.pending_shot != coordinate:
-        raise InvalidShotResult(
-            f"coordinate {coordinate!r} does not match the pending shot "
-            f"{game_session.pending_shot!r}"
-        )
+        raise OutOfSequence(f"session {session_id} has no shot awaiting a result")
 
     pending = await session.execute(
         select(Shot)
         .where(
-            Shot.session_id == game_id,
+            Shot.session_id == session_id,
             Shot.direction == "outgoing",
             Shot.result.is_(None),
         )
@@ -122,12 +113,11 @@ async def handle_shot_result(
     await session.flush()
 
 
-async def handle_close(session: AsyncSession, game_id: uuid.UUID, reason: str) -> None:
-    """Ручка 5 — арена закрывает сессию. Повторное закрытие не идемпотентно (400)."""
-    game_session = await lock_session(session, game_id)
+async def handle_close(session: AsyncSession, session_id: uuid.UUID) -> None:
+
+    game_session = await lock_session(session, session_id)
     if game_session.status == "closed":
-        raise AlreadyClosed(f"game {game_id} is already closed")
+        raise AlreadyClosed(f"session {session_id} is already closed")
 
     game_session.status = "closed"
-    game_session.close_reason = reason
     await session.flush()
