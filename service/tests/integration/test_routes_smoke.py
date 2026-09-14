@@ -94,6 +94,27 @@ async def test_opponent_shot_route_unknown_session_404(client: AsyncClient) -> N
     assert response.json() == {"detail": f"session {missing_id} not found"}
 
 
+async def test_shot_route_unknown_session_404(client: AsyncClient) -> None:
+    missing_id = uuid.uuid4()
+    response = await client.post(f"/game/{missing_id}/shot")
+    assert response.status_code == 404
+    assert response.json() == {"detail": f"session {missing_id} not found"}
+
+
+async def test_shot_result_route_unknown_session_404(client: AsyncClient) -> None:
+    missing_id = uuid.uuid4()
+    response = await client.post(f"/game/{missing_id}/shot/result", json={"result": "hit"})
+    assert response.status_code == 404
+    assert response.json() == {"detail": f"session {missing_id} not found"}
+
+
+async def test_close_route_unknown_session_404(client: AsyncClient) -> None:
+    missing_id = uuid.uuid4()
+    response = await client.post(f"/game/{missing_id}/close")
+    assert response.status_code == 404
+    assert response.json() == {"detail": f"session {missing_id} not found"}
+
+
 async def test_route_with_malformed_session_id_is_404(client: AsyncClient) -> None:
     # Не-UUID в пути — «сессия не найдена», а не 422: кода 422 в контракте нет.
     response = await client.post("/game/not-a-uuid/opponent-shot", json={"coordinate": "A1"})
