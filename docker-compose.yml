@@ -32,6 +32,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  app2:
+    build:
+      context: ./service
+      target: runtime
+    container_name: battleship-app2
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
   arena:
     build:
       context: ./arena
