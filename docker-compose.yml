@@ -32,6 +32,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  arena:
+    build:
+      context: ./arena
+      target: runtime
+    container_name: battleship-arena
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    depends_on:
+      app:
+        condition: service_started
+
   tests:
     build:
       context: ./service
@@ -42,6 +54,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    profiles:
+      - test
+
+  arena-tests:
+    build:
+      context: ./arena
+      target: test
     profiles:
       - test
 
