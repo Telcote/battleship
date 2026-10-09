@@ -56,6 +56,10 @@ async def play(
             opponent = next((p.address for p in log.players if p.address != exc.address), None)
             verdict = Verdict(opponent, exc.address, exc.reason, str(exc))
 
+        except Exception as exc:
+            # Без этого матч навсегда остался бы в "running".
+            verdict = Verdict(None, None, "arena_error", f"{type(exc).__name__}: {exc}")
+
         finally:
             for client, session_id in sessions:
                 try:

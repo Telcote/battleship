@@ -18,6 +18,7 @@ EndReason = Literal[
     "invalid_placement",
     "invalid_shot",
     "lie",
+    "arena_error",
 ]
 
 
