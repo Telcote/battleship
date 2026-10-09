@@ -63,7 +63,8 @@ class FakePlayer:
 
         self.session_id: uuid.UUID | None = None
         self.hits: set[str] = set()
-        self.next_shot: Iterator[str] = iter(shots if shots is not None else SCAN_ORDER)
+        self.shots = shots if shots is not None else SCAN_ORDER
+        self.next_shot: Iterator[str] = iter(self.shots)
         self.results_received: list[str] = []
         self.results_reported: list[str] = []
         self.shots_received: list[str] = []
@@ -90,6 +91,9 @@ class FakePlayer:
         return httpx.Response(404, json={"detail": "not found"})
 
     def _start_game(self) -> httpx.Response:
+        # Новая партия — чистое поле и стрельба с начала: в турнире заглушка играет много раз.
+        self.hits = set()
+        self.next_shot = iter(self.shots)
         self.session_id = self.fixed_session_id or uuid.uuid4()
         return httpx.Response(
             201,
