@@ -44,3 +44,20 @@ async def client(session: AsyncSession) -> AsyncClient:
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.pop(get_session, None)
+
+
+@pytest_asyncio.fixture
+async def request_client() -> AsyncIterator[AsyncClient]:
+    test_engine = create_async_engine(settings.database_url)
+    test_session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
+
+    async def _get_request_session() -> AsyncIterator[AsyncSession]:
+        async with test_session_factory() as db_session:
+            yield db_session
+
+    app.dependency_overrides[get_session] = _get_request_session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.pop(get_session, None)
+    await test_engine.dispose()
