@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 FROM base AS source
 
 COPY app ./app
+COPY rogue ./rogue
 
 
 FROM source AS runtime

@@ -60,6 +60,22 @@ services:
       app:
         condition: service_started
 
+  rogue:
+    build:
+      context: ./arena
+      target: runtime
+    container_name: battleship-rogue
+    command: ["uvicorn", "rogue.main:app", "--host", "0.0.0.0", "--port", "8200"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "8200:8200"
+    profiles:
+      - rogue
+
   tests:
     build:
       context: ./service
