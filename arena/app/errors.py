@@ -48,7 +48,7 @@ class InvalidPlacement(PlayerFault):
 
 
 class InvalidShot(PlayerFault):
-    """Координата выстрела не из A1–J10."""
+    """Недействительная координата выстрела: координата вне поля или уже обстрелена"""
 
     reason = "invalid_shot"
 

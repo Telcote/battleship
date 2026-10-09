@@ -1,7 +1,7 @@
 import random
 import uuid
 from contextlib import nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -21,6 +21,7 @@ class Side:
     client: PlayerClient
     session_id: uuid.UUID
     board: Board
+    fired: set[str] = field(default_factory=set)
 
     @property
     def address(self) -> str:
@@ -73,7 +74,8 @@ async def play(
 async def _relay(log: MatchLog, attacker: Side, defender: Side) -> Verdict:
     for _ in range(MAX_SHOTS):
         coordinate = await attacker.client.ask_shot(attacker.session_id)
-        referee.accept_shot(attacker.address, coordinate)
+        referee.accept_shot(attacker.address, coordinate, attacker.fired)
+        attacker.fired.add(coordinate)
         result = await defender.client.send_opponent_shot(defender.session_id, coordinate)
         referee.accept_result(defender.address, defender.board, coordinate, result)
         await attacker.client.send_shot_result(attacker.session_id, result)

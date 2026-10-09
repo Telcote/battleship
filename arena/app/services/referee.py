@@ -16,12 +16,13 @@ def accept_placement(address: str, ships: list[list[str]]) -> Board:
         raise InvalidPlacement(address, str(exc)) from exc
 
 
-def accept_shot(address: str, coordinate: str) -> None:
-    """Проверяется до пересылки: иначе за мусор атакующего ответил бы 400 честный защитник."""
+def accept_shot(address: str, coordinate: str, fired: set[str]) -> None:
     try:
         coordinates.parse(coordinate)
     except ValueError as exc:
         raise InvalidShot(address, str(exc)) from exc
+    if coordinate in fired:
+        raise InvalidShot(address, f"cell {coordinate} already fired at")
 
 
 def accept_result(address: str, board: Board, coordinate: str, reported: str) -> None:
