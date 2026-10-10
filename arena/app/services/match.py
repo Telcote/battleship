@@ -45,6 +45,7 @@ async def play(
                 started = await client.start_game()
                 sessions.append((client, started.session_id))
                 ships = [ship.coordinates for ship in started.ships]
+                log.ships[player.address] = ships
                 board = referee.accept_placement(player.address, ships)
                 sides.append(Side(client, started.session_id, board))
 

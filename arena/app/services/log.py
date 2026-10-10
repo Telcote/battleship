@@ -53,6 +53,8 @@ class MatchLog:
     created_at: dt.datetime
     status: MatchStatus = "pending"
     first_move: str | None = None
+    # Расстановки как их выдали игроки — в том числе отвергнутые судьёй: так видно, что не так.
+    ships: dict[str, list[list[str]]] = field(default_factory=dict)
     events: list[Event] = field(default_factory=list)
     verdict: Verdict | None = None
     finished_at: dt.datetime | None = None
