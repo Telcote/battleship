@@ -221,3 +221,25 @@ async def test_slow_player_loses_by_timeout(monkeypatch: pytest.MonkeyPatch) -> 
     assert log.verdict is not None
     assert log.verdict.reason == "timeout"
     assert (log.verdict.winner, log.verdict.loser) == (ALPHA, BRAVO)
+
+
+async def test_placements_are_logged() -> None:
+    log = await play(FakePlayer("alpha"), FakePlayer("bravo"))
+
+    assert log.ships == {ALPHA: VALID_FLEET, BRAVO: VALID_FLEET}
+
+
+async def test_rejected_placement_is_logged_as_sent() -> None:
+    """Просмотрщику нужна именно отвергнутая расстановка — по ней видно нарушение."""
+    touching = [*VALID_FLEET[:-1], ["B1"]]
+    log = await play(FakePlayer("alpha"), FakePlayer("bravo", ships=touching))
+
+    assert log.verdict is not None
+    assert log.verdict.reason == "invalid_placement"
+    assert log.ships[BRAVO] == touching
+
+
+async def test_player_without_placement_is_absent_from_ships() -> None:
+    log = await play(FakePlayer("alpha"), FakePlayer("bravo", fail_on="/game"))
+
+    assert BRAVO not in log.ships
