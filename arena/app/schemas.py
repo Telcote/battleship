@@ -92,6 +92,8 @@ class TournamentResponse(BaseModel):
     matches_total: int
     matches_finished: int
     match_ids: list[uuid.UUID]
+    # Сводки партий без событий: просмотрщику не нужен отдельный запрос на каждую.
+    matches: list[MatchResponse]
     standings: list[StandingRow]
     created_at: dt.datetime
     finished_at: dt.datetime | None

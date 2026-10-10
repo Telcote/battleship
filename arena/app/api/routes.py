@@ -98,6 +98,7 @@ def _to_tournament_response(item: Tournament) -> TournamentResponse:
             "matches_total": item.matches_total,
             "matches_finished": sum(log.status == "finished" for log in item.matches),
             "match_ids": [log.id for log in item.matches],
+            "matches": [_to_response(log) for log in item.matches],
             "standings": tournament.standings(item),
             "created_at": item.created_at,
             "finished_at": item.finished_at,

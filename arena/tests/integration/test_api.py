@@ -151,6 +151,8 @@ async def test_tournament_is_played_out_in_the_background(client: AsyncClient) -
     assert body["status"] == "finished"
     assert body["matches_finished"] == body["matches_total"] == 3
     assert sum(row["played"] for row in body["standings"]) == 6
+    assert [item["match_id"] for item in body["matches"]] == body["match_ids"]
+    assert all(item["status"] == "finished" for item in body["matches"])
     for match_id in body["match_ids"]:
         assert (await client.get(f"/match/{match_id}")).status_code == 200
 
