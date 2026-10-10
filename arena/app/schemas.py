@@ -1,11 +1,3 @@
-"""API самой арены: то, чем ею управляют снаружи. К контракту «Арена ↔ Сервис» отношения не имеет.
-
-Участник везде обозначается своим `address` (`ip:port`) — см. services/identity.py.
-Имён у игроков нет: адрес и есть имя.
-
-Модели ответов собираются прямо из dataclass'ов services/log.py (`from_attributes`).
-"""
-
 import datetime as dt
 import uuid
 
@@ -69,6 +61,38 @@ class MatchResponse(BaseModel):
 class MatchLogResponse(BaseModel):
     match_id: uuid.UUID
     events: list[MatchEvent]
+
+
+# POST /tournament
+class CreateTournamentRequest(BaseModel):
+    players: list[PlayerEntry] = Field(min_length=2)
+    games_per_pair: int = Field(default=1, ge=1, le=100)
+    seed: int | None = None
+
+
+class StandingRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    address: str
+    base_url: str
+    played: int
+    wins: int
+    losses: int
+    draws: int
+    faults: dict[str, int]
+
+
+class TournamentResponse(BaseModel):
+    tournament_id: uuid.UUID
+    status: MatchStatus
+    players: list[PlayerRef]
+    games_per_pair: int
+    matches_total: int
+    matches_finished: int
+    match_ids: list[uuid.UUID]
+    standings: list[StandingRow]
+    created_at: dt.datetime
+    finished_at: dt.datetime | None
 
 
 class ErrorResponse(BaseModel):

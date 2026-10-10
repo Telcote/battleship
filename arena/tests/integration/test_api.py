@@ -1,9 +1,3 @@
-"""API арены. Игроки здесь заведомо недоступны — проверяем ручки, а не игру.
-
-Адреса берём literal-ами `127.0.0.x:9` (discard): резолв обходится без DNS, а в
-соединении отказывают сразу, поэтому фоновая партия не уходит в таймаут.
-"""
-
 from collections.abc import AsyncIterator
 
 import pytest_asyncio
@@ -13,6 +7,7 @@ from app.main import app
 
 DEAD = "http://127.0.0.1:9"
 OTHER_DEAD = "http://127.0.0.2:9"
+THIRD_DEAD = "http://127.0.0.3:9"
 
 
 @pytest_asyncio.fixture
@@ -123,3 +118,59 @@ async def test_matches_are_listed_newest_first(client: AsyncClient) -> None:
     listed = [item["match_id"] for item in (await client.get("/match")).json()]
 
     assert listed.index(second) < listed.index(first)
+
+
+def tournament_body(*base_urls: str, games_per_pair: int = 1) -> dict:
+    return {
+        "players": [{"base_url": url} for url in base_urls],
+        "games_per_pair": games_per_pair,
+    }
+
+
+async def test_create_tournament_returns_201_and_the_schedule(client: AsyncClient) -> None:
+    response = await client.post(
+        "/tournament", json=tournament_body(DEAD, OTHER_DEAD, THIRD_DEAD, games_per_pair=2)
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["matches_total"] == 6
+    assert body["games_per_pair"] == 2
+    assert len(body["standings"]) == 3
+
+
+async def test_tournament_is_played_out_in_the_background(client: AsyncClient) -> None:
+    created = await client.post(
+        "/tournament", json=tournament_body(DEAD, OTHER_DEAD, THIRD_DEAD)
+    )
+    tournament_id = created.json()["tournament_id"]
+
+    body = (await client.get(f"/tournament/{tournament_id}")).json()
+
+    assert body["status"] == "finished"
+    assert body["matches_finished"] == body["matches_total"] == 3
+    assert sum(row["played"] for row in body["standings"]) == 6
+    for match_id in body["match_ids"]:
+        assert (await client.get(f"/match/{match_id}")).status_code == 200
+
+
+async def test_tournament_rejects_the_same_service_twice(client: AsyncClient) -> None:
+    response = await client.post(
+        "/tournament", json=tournament_body(DEAD, OTHER_DEAD, DEAD + "/")
+    )
+
+    assert response.status_code == 400
+    assert "127.0.0.1:9" in response.json()["detail"]
+
+
+async def test_tournament_needs_two_players(client: AsyncClient) -> None:
+    response = await client.post("/tournament", json=tournament_body(DEAD))
+
+    assert response.status_code == 400
+
+
+async def test_unknown_tournament_is_404(client: AsyncClient) -> None:
+    response = await client.get("/tournament/550e8400-e29b-41d4-a716-446655440000")
+
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"]
