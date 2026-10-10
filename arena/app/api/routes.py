@@ -49,7 +49,9 @@ async def get_match(match_id: uuid.UUID) -> MatchResponse:
 @router.get("/match/{match_id}/log", response_model=MatchLogResponse)
 async def get_match_log(match_id: uuid.UUID) -> MatchLogResponse:
     log = storage.get(match_id)
-    return MatchLogResponse.model_validate({"match_id": log.id, "events": log.events})
+    return MatchLogResponse.model_validate(
+        {"match_id": log.id, "ships": log.ships, "events": log.events}
+    )
 
 
 @router.post(

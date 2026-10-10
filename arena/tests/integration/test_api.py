@@ -108,6 +108,7 @@ async def test_match_log_is_available(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["match_id"] == match_id
+    assert response.json()["ships"] == {}
     assert response.json()["events"] == []
 
 
@@ -174,3 +175,4 @@ async def test_unknown_tournament_is_404(client: AsyncClient) -> None:
 
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
+

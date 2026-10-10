@@ -60,6 +60,8 @@ class MatchResponse(BaseModel):
 # GET /match/{match_id}/log
 class MatchLogResponse(BaseModel):
     match_id: uuid.UUID
+    # Адрес -> корабли. Игрока, не приславшего расстановку, здесь нет.
+    ships: dict[str, list[list[str]]]
     events: list[MatchEvent]
 
 
