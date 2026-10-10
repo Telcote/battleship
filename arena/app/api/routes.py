@@ -13,7 +13,7 @@ from app.schemas import (
 )
 from app.services import identity, match, tournament
 from app.services.log import MatchLog, Player, Tournament
-from app.services.storage import storage, tournaments
+from app.services.storage import find_match, storage, tournaments
 
 router = APIRouter()
 
@@ -43,12 +43,12 @@ async def list_matches() -> list[MatchResponse]:
 
 @router.get("/match/{match_id}", response_model=MatchResponse)
 async def get_match(match_id: uuid.UUID) -> MatchResponse:
-    return _to_response(storage.get(match_id))
+    return _to_response(find_match(match_id))
 
 
 @router.get("/match/{match_id}/log", response_model=MatchLogResponse)
 async def get_match_log(match_id: uuid.UUID) -> MatchLogResponse:
-    log = storage.get(match_id)
+    log = find_match(match_id)
     return MatchLogResponse.model_validate(
         {"match_id": log.id, "ships": log.ships, "events": log.events}
     )
