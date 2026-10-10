@@ -1,12 +1,10 @@
-"""Реестр сыгранного: последние `match_history_limit` матчей в памяти процесса."""
-
 import datetime as dt
 import uuid
 from collections import OrderedDict
 
 from app.config import settings
-from app.errors import MatchNotFound
-from app.services.log import MatchLog, Player
+from app.errors import MatchNotFound, TournamentNotFound
+from app.services.log import MatchLog, Player, Tournament
 
 
 class MatchStorage:
@@ -32,3 +30,32 @@ class MatchStorage:
 
 
 storage = MatchStorage()
+
+
+class TournamentStorage:
+    """Турниры не вытесняются: их единицы, а таблица нужна до конца."""
+
+    def __init__(self) -> None:
+        self._tournaments: dict[uuid.UUID, Tournament] = {}
+
+    def create(self, players: list[Player], games_per_pair: int) -> Tournament:
+        tournament = Tournament(
+            id=uuid.uuid4(),
+            players=players,
+            games_per_pair=games_per_pair,
+            created_at=dt.datetime.now(dt.UTC),
+        )
+        self._tournaments[tournament.id] = tournament
+        return tournament
+
+    def get(self, tournament_id: uuid.UUID) -> Tournament:
+        tournament = self._tournaments.get(tournament_id)
+        if tournament is None:
+            raise TournamentNotFound(f"tournament {tournament_id} not found")
+        return tournament
+
+    def list(self) -> list[Tournament]:
+        return list(reversed(self._tournaments.values()))
+
+
+tournaments = TournamentStorage()

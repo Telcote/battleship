@@ -15,6 +15,10 @@ class MatchNotFound(ArenaError):
     """match_id не существует. GET /match/{id} → 404."""
 
 
+class TournamentNotFound(ArenaError):
+    """tournament_id не существует. GET /tournament/{id} → 404."""
+
+
 class InvalidMatchRequest(ArenaError):
     """Некорректная заявка: битый адрес, неразрешимый хост, оба участника — один сервис. → 400."""
 
@@ -61,6 +65,7 @@ class Lie(PlayerFault):
 
 _STATUS_BY_ERROR: dict[type[ArenaError], int] = {
     MatchNotFound: status.HTTP_404_NOT_FOUND,
+    TournamentNotFound: status.HTTP_404_NOT_FOUND,
     InvalidMatchRequest: status.HTTP_400_BAD_REQUEST,
 }
 

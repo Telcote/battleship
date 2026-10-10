@@ -8,5 +8,7 @@ class Settings(BaseSettings):
 
     match_history_limit: int = 100
 
+    tournament_parallel: int = 4
+
 
 settings = Settings()

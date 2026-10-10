@@ -64,3 +64,21 @@ class MatchLog:
         self.verdict = verdict
         self.status = "finished"
         self.finished_at = dt.datetime.now(dt.UTC)
+
+
+@dataclass
+class Tournament:
+    """Круговой турнир. Партии хранятся здесь же: из реестра матчей их может вытеснить лимит."""
+
+    id: uuid.UUID
+    players: list[Player]
+    games_per_pair: int
+    created_at: dt.datetime
+    status: MatchStatus = "pending"
+    matches: list[MatchLog] = field(default_factory=list)
+    finished_at: dt.datetime | None = None
+
+    @property
+    def matches_total(self) -> int:
+        n = len(self.players)
+        return n * (n - 1) // 2 * self.games_per_pair

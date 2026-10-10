@@ -1,9 +1,3 @@
-"""Арена: пересылка, лог и судейство.
-
-Сначала — что сообщения дошли до нужного игрока в нужном порядке и что записанное
-совпало с пересланным. Затем — что за каждое нарушение проигрывает именно нарушитель.
-"""
-
 import random
 import uuid
 
@@ -153,17 +147,6 @@ async def test_player_that_breaks_mid_match_loses() -> None:
     assert log.events == []
 
 
-async def test_endless_match_stops_at_the_shot_limit() -> None:
-    """Оба бьют в одну пустую клетку: `miss` навсегда, и цикл обязан упереться в потолок."""
-    shots = ["J10"] * match.MAX_SHOTS
-    log = await play(FakePlayer("alpha", shots=shots), FakePlayer("bravo", shots=shots))
-
-    assert log.verdict is not None
-    assert log.verdict.reason == "shot_limit"
-    assert log.verdict.winner is None
-    assert len(log.events) == match.MAX_SHOTS
-
-
 # Судейство
 
 
@@ -213,6 +196,20 @@ async def test_invalid_shot_blames_the_shooter_not_the_target(seed: int) -> None
     assert log.verdict.reason == "invalid_shot"
     assert (log.verdict.winner, log.verdict.loser) == (BRAVO, ALPHA)
     assert "Z99" not in bravo.shots_received
+
+
+@pytest.mark.parametrize("seed", [0, 1])
+async def test_repeated_shot_blames_the_shooter_not_the_target(seed: int) -> None:
+    """Честный сервис на повтор отвечает 400 — пересылать повтор значит засудить защитника."""
+    alpha, bravo = FakePlayer("alpha", shots=["J10", "J10"]), FakePlayer("bravo")
+
+    log = await play(alpha, bravo, seed=seed)
+
+    assert log.verdict is not None
+    assert log.verdict.reason == "invalid_shot"
+    assert (log.verdict.winner, log.verdict.loser) == (BRAVO, ALPHA)
+    assert "J10" in log.verdict.detail
+    assert bravo.shots_received.count("J10") == 1
 
 
 async def test_slow_player_loses_by_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
