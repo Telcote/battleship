@@ -59,3 +59,15 @@ class TournamentStorage:
 
 
 tournaments = TournamentStorage()
+
+
+def find_match(match_id: uuid.UUID) -> MatchLog:
+    """Партия турнира остаётся доступной, даже когда реестр матчей её уже вытеснил."""
+    try:
+        return storage.get(match_id)
+    except MatchNotFound:
+        for tournament in tournaments.list():
+            for log in tournament.matches:
+                if log.id == match_id:
+                    return log
+        raise
