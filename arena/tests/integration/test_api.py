@@ -178,3 +178,18 @@ async def test_unknown_tournament_is_404(client: AsyncClient) -> None:
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
 
+
+async def test_viewer_is_served(client: AsyncClient) -> None:
+    response = await client.get("/ui/")
+
+    assert response.status_code == 200
+    assert "Battleship Arena" in response.text
+    assert (await client.get("/ui/main.js")).status_code == 200
+    assert (await client.get("/ui/views/match.js")).status_code == 200
+
+
+async def test_root_redirects_to_viewer(client: AsyncClient) -> None:
+    response = await client.get("/")
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/ui/"
