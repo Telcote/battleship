@@ -15,6 +15,8 @@ app.include_router(router)
 
 app.mount("/ui", StaticFiles(directory=STATIC / "ui", html=True), name="ui")
 
+app.mount("/admin", StaticFiles(directory=STATIC / "admin", html=True), name="admin")
+
 
 @app.get("/health")
 async def health() -> dict[str, str]:

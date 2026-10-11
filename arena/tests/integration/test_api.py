@@ -188,6 +188,18 @@ async def test_viewer_is_served(client: AsyncClient) -> None:
     assert (await client.get("/ui/views/match.js")).status_code == 200
 
 
+async def test_admin_panel_is_served(client: AsyncClient) -> None:
+    response = await client.get("/admin/")
+
+    assert response.status_code == 200
+    assert "/ui/main.js" in response.text
+    assert (await client.get("/admin/new.js")).status_code == 200
+
+
+async def test_viewer_does_not_ship_admin_code(client: AsyncClient) -> None:
+    assert (await client.get("/ui/new.js")).status_code == 404
+
+
 async def test_root_redirects_to_viewer(client: AsyncClient) -> None:
     response = await client.get("/")
 

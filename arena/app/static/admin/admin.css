@@ -1,0 +1,25 @@
+.entry {
+  margin-bottom: 0.75rem;
+}
+
+.entry [role="group"] {
+  margin-bottom: 0.25rem;
+}
+
+.entry small {
+  display: block;
+  min-height: 1.2em;
+  color: var(--pico-del-color);
+}
+
+.entry .remove:disabled {
+  opacity: 0.35;
+}
+
+.form-error {
+  color: var(--pico-del-color);
+}
+
+#summary {
+  color: var(--pico-muted-color);
+}
