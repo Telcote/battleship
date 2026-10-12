@@ -119,3 +119,36 @@ def test_generate_places_ships_within_board_bounds() -> None:
         for ship in ships:
             for cell in ship:
                 assert coordinates.is_valid(cell)
+
+
+def _on_border(coordinate: str) -> bool:
+    from app.domain import coordinates
+
+    col, row = coordinates.parse(coordinate)
+    last = coordinates.BOARD_SIZE - 1
+    return col in (0, last) or row in (0, last)
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_generate_keeps_big_ships_on_the_border(seed: int) -> None:
+    ships = placement.generate(random.Random(seed))
+
+    for ship in ships:
+        if len(ship) > 1:
+            assert all(_on_border(cell) for cell in ship), ship
+
+
+def test_generate_leaves_open_water_for_single_deckers() -> None:
+    from app.domain import coordinates
+
+    for seed in range(20):
+        big = [coordinates.parse(c) for ship in placement.generate(random.Random(seed)) if len(ship) > 1 for c in ship]
+        taken = set(big) | coordinates.halo(big)
+        assert 100 - len(taken) >= 50
+
+
+def test_generate_varies_between_games() -> None:
+    layouts = {
+        tuple(map(tuple, placement.generate(random.Random(seed)))) for seed in range(20)
+    }
+    assert len(layouts) == 20
