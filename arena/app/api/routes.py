@@ -7,11 +7,12 @@ from app.errors import InvalidMatchRequest
 from app.schemas import (
     CreateMatchRequest,
     CreateTournamentRequest,
+    KnownPlayerResponse,
     MatchLogResponse,
     MatchResponse,
     TournamentResponse,
 )
-from app.services import identity, match, tournament
+from app.services import discovery, identity, match, tournament
 from app.services.log import MatchLog, Player, Tournament
 from app.services.storage import find_match, storage, tournaments
 
@@ -86,6 +87,12 @@ async def list_tournaments() -> list[TournamentResponse]:
 @router.get("/tournament/{tournament_id}", response_model=TournamentResponse)
 async def get_tournament(tournament_id: uuid.UUID) -> TournamentResponse:
     return _to_tournament_response(tournaments.get(tournament_id))
+
+
+@router.get("/players", response_model=list[KnownPlayerResponse])
+async def list_players() -> list[KnownPlayerResponse]:
+    players = await discovery.scanner.current()
+    return [KnownPlayerResponse.model_validate(player) for player in players]
 
 
 def _to_tournament_response(item: Tournament) -> TournamentResponse:

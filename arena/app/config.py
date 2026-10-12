@@ -10,5 +10,9 @@ class Settings(BaseSettings):
 
     tournament_parallel: int = 4
 
+    # Где искать игроков в Docker-сети арены (см. services/discovery.py) и как часто.
+    discovery_ports: str = "80,8000-8010,8080,8200"
+    discovery_interval: float = 30.0
+
 
 settings = Settings()

@@ -14,7 +14,7 @@ cp .env.example .env
 
 | Профиль | Сервисы | Для чего |
 | --- | --- | --- |
-| без профиля | `db`, `app` (:8000), `app2` (:8001), `arena` (:8100) | два экземпляра сервиса и арена |
+| без профиля | `db`, `app` (:8000), `app2` (:8001), `arena` (:80) | два экземпляра сервиса и арена |
 | `test` | `tests`, `arena-tests` | тесты сервиса и арены |
 | `rogue` | `rogue` (:8200) | игрок-жулик для проверки арены |
 
@@ -50,16 +50,16 @@ docker compose up -d --build
 ```
 
 Миграции сервиса накатываются при старте. Проверка: `curl localhost:8000/health`,
-`curl localhost:8100/health`.
+`curl localhost/health`.
 
 ### Одна партия
 
 ```bash
-curl -X POST localhost:8100/match -H 'content-type: application/json' \
+curl -X POST localhost/match -H 'content-type: application/json' \
   -d '{"players": [{"base_url": "http://app:8000"}, {"base_url": "http://app2:8000"}]}'
 
-curl localhost:8100/match/<match_id>        # статус и итог
-curl localhost:8100/match/<match_id>/log    # все выстрелы по порядку
+curl localhost/match/<match_id>        # статус и итог
+curl localhost/match/<match_id>/log    # все выстрелы по порядку
 ```
 
 Адреса игроков арена разрешает из своего контейнера, поэтому внутри compose — имена
@@ -71,11 +71,11 @@ curl localhost:8100/match/<match_id>/log    # все выстрелы по по�
 `TOURNAMENT_PARALLEL` партий (по умолчанию 4).
 
 ```bash
-curl -X POST localhost:8100/tournament -H 'content-type: application/json' \
+curl -X POST localhost/tournament -H 'content-type: application/json' \
   -d '{"players": [{"base_url": "http://app:8000"}, {"base_url": "http://app2:8000"}],
        "games_per_pair": 5, "seed": 1}'
 
-curl localhost:8100/tournament/<tournament_id>   # прогресс и турнирная таблица
+curl localhost/tournament/<tournament_id>   # прогресс и турнирная таблица
 ```
 
 Турниры и партии хранятся в памяти арены: перезапуск контейнера их стирает.
@@ -110,7 +110,7 @@ docker compose --profile rogue down -v     # и удалить данные БД
 ## Если Docker не на этой машине
 
 В devcontainer с Docker-outside-of-Docker опубликованные порты живут на хосте, и
-`localhost:8100` изнутри контейнера разработки недоступен. Запросы тогда шлются из
+`localhost` (порт 80) изнутри контейнера разработки недоступен. Запросы тогда шлются из
 контейнера арены:
 
 ```bash

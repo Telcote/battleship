@@ -99,5 +99,14 @@ class TournamentResponse(BaseModel):
     finished_at: dt.datetime | None
 
 
+# GET /players
+class KnownPlayerResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    base_url: str
+    address: str
+    name: str
+
+
 class ErrorResponse(BaseModel):
     detail: str

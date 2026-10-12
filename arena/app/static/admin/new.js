@@ -1,12 +1,13 @@
 import { api } from "/ui/api.js";
 import { esc } from "/ui/html.js";
+import { poll } from "/ui/life.js";
 
 const MIN_PLAYERS = 2;
 const MAX_ROUNDS = 100;
 const RECENT_KEY = "arena:recent-players";
 const RECENT_LIMIT = 20;
 
-export async function newTournamentView({ root, params }) {
+export async function newTournamentView({ root, life, params }) {
   const initial = params.getAll("player");
   while (initial.length < MIN_PLAYERS) initial.push("");
   const rounds = Number(params.get("rounds")) || 1;
@@ -21,6 +22,7 @@ export async function newTournamentView({ root, params }) {
     <form id="form" novalidate>
       <fieldset>
         <legend>Players</legend>
+        <div id="known" class="known" hidden></div>
         <div id="players"></div>
         <button type="button" class="secondary outline" id="add">+ Add player</button>
       </fieldset>
@@ -45,6 +47,8 @@ export async function newTournamentView({ root, params }) {
   const error = $("#error");
   // Пустые и кривые адреса подсвечиваем только после первой попытки отправить форму.
   let submitted = false;
+  // Игроки, о которых знает арена (GET /players), — кнопки быстрого добавления.
+  let known = [];
 
   const entries = () => [...list.querySelectorAll(".entry")];
   const urls = () => entries().map((entry) => entry.querySelector("input").value.trim());
@@ -83,7 +87,39 @@ export async function newTournamentView({ root, params }) {
       ? `${players} players · ${plural(pairs, "pair")} · ${plural(roundsValue, "round")} each =
          <strong>${plural(pairs * roundsValue, "match", "matches")}</strong>`
       : `Rounds per pair must be between 1 and ${MAX_ROUNDS}.`;
+    renderKnown(values);
     return valid && roundsOk;
+  }
+
+  // Режимы жулика — разные адреса одного сервиса: второй такой в турнир не взять.
+  function renderKnown(values) {
+    const box = $("#known");
+    box.hidden = known.length === 0;
+    const listed = new Set(values.filter(Boolean).map(normalize));
+    const taken = new Set(known.filter((player) => listed.has(normalize(player.base_url))).map((player) => player.address));
+    box.innerHTML =
+      "<small>Known players</small>" +
+      known
+        .map((player) => {
+          const why =
+            listed.has(normalize(player.base_url)) ? "Already in the list"
+            : taken.has(player.address) ? "Same service as a player in the list"
+            : "";
+          return `<button type="button" class="secondary outline"
+                    data-url="${esc(player.base_url)}" title="${esc(why || player.base_url)}"
+                    ${why ? "disabled" : ""}>${esc(player.name)}</button>`;
+        })
+        .join("");
+  }
+
+  // Подсказка занимает первое пустое поле, а если пустых нет — новое.
+  function pick(url) {
+    const blank = entries().find((entry) => !entry.querySelector("input").value.trim());
+    if (blank) {
+      blank.querySelector("input").value = url;
+      error.hidden = true;
+      refresh();
+    } else addPlayer(url);
   }
 
   // Ошибку сервера показываем у того игрока, о котором она: в ней процитирован его адрес или хост.
@@ -100,6 +136,10 @@ export async function newTournamentView({ root, params }) {
     error.hidden = placed;
   }
 
+  $("#known").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-url]");
+    if (button) pick(button.dataset.url);
+  });
   $("#add").addEventListener("click", () => {
     addPlayer();
     list.lastElementChild.querySelector("input").focus();
@@ -143,6 +183,14 @@ export async function newTournamentView({ root, params }) {
   });
 
   initial.forEach(addPlayer);
+
+  // Арена сама ищет игроков в своей Docker-сети: новые могут появиться, пока форма открыта.
+  poll(life, async () => {
+    known = await api("/players").catch(() => []);
+    if (!life.alive) return false;
+    renderKnown(urls());
+    return true;
+  }).catch(life.fail);
 }
 
 function playerEntry(value) {

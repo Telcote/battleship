@@ -16,6 +16,27 @@
   opacity: 0.35;
 }
 
+.known {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.known button {
+  width: auto;
+  margin: 0;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.known button::before {
+  content: "●";
+  margin-right: 0.35rem;
+  color: var(--pico-ins-color);
+}
+
 .form-error {
   color: var(--pico-del-color);
 }
