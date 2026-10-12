@@ -1,9 +1,13 @@
 from collections.abc import AsyncIterator
 
+import time
+
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.services import discovery
 
 DEAD = "http://127.0.0.1:9"
 OTHER_DEAD = "http://127.0.0.2:9"
@@ -194,6 +198,22 @@ async def test_admin_panel_is_served(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert "/ui/main.js" in response.text
     assert (await client.get("/admin/new.js")).status_code == 200
+
+
+async def test_discovered_players_are_listed(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scanner = discovery.Scanner()
+    scanner.players = [discovery.KnownPlayer("http://battleship-app:8000", "172.20.0.4:8000", "battleship-app")]
+    scanner.scanned_at = time.monotonic()
+    monkeypatch.setattr(discovery, "scanner", scanner)
+
+    response = await client.get("/players")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"base_url": "http://battleship-app:8000", "address": "172.20.0.4:8000", "name": "battleship-app"}
+    ]
 
 
 async def test_viewer_does_not_ship_admin_code(client: AsyncClient) -> None:
